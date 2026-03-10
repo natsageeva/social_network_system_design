@@ -1,0 +1,771 @@
+openapi: 3.0.2
+
+info:
+  title: Социальная сеть для путешественников
+  version: 1.0.0
+servers:
+  - url: https://localhost/api/v1
+
+tags:
+  - name: Posts
+    description: Управление публикациями
+  - name: Comments
+    description: Управление комментариями
+  - name: Likes
+    description: Управление лайками
+  - name: Subscriptions
+    description: Управление подписками
+  - name: Locations
+    description: Управление поиском
+  - name: Feed
+    description: Управление лентой контента
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PostId:
+      name: post_id
+      description: Идентификатор публикации
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    From:
+      name: from
+      description: Время начала выборки (поддерживаемые поля - created_at)
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+    Until:
+      name: until
+      description: Время конца выборки (поддерживаемые поля - created_at)
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+    Limit:
+      name: limit
+      description: Ограничение на количество записей
+      in: query
+      required: false
+      schema:
+        type: integer
+    Offset:
+      name: offset
+      description: Смещение
+      in: query
+      required: false
+      schema:
+        type: integer
+    Order:
+      name: order
+      description: Направление сортировки
+      in: query
+      required: false
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+    UserId:
+      name: user_id
+      description: Идентификатор пользователя
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Location:
+      name: location
+      description: Название места
+      in: query
+      required: false
+      schema:
+        type: string
+
+  schemas:
+    Empty:
+      type: object
+    ImagesResponse:
+      type: object
+      properties:
+        images:
+          description: Массив информации об изображениях
+          type: array
+          items:
+            type: object
+            required:
+              - image_id
+              - created_at
+              - image_name
+              - image_size
+            properties:
+              image_id:
+                description: Уникальный идентификатор загруженного файла
+                type: string
+                format: uuid
+                example: d06447d8-2af4-4100-90ed-67c7f12466b7
+              created_at:
+                description: Дата и время загрузки
+                type: string
+                format: date-time
+                example: 2025-03-09T12:00:00Z
+              file_name:
+                description: Имя файла
+                type: string
+                example: image.jpg
+              file_size:
+                description: Размер файла в байтах
+                type: integer
+                example: 819200
+    PostRequest:
+      type: object
+      required:
+        - title
+        - content
+        - media_ids
+      properties:
+        title:
+          description: Заголовок поста
+          type: string
+          example: Как я провел свое лето
+          maxLength: 200
+        content:
+          description: Текст поста
+          type: string
+          maxLength: 5000
+          example: Twitter, Netflix, Junk food
+        media_ids:
+          type: array
+          description: Список идентификаторов ранее загруженных изображений
+          items:
+            type: string
+            maxItems: 10
+          example:
+            [
+              "d06447d8-2af4-4100-90ed-67c7f12466b7",
+              "3a70cc06-0a09-42fe-a526-9a668b318065",
+            ]
+    LikeRequest:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          description: Признак установки лайка (true - установка лайка, false - снятие лайка)
+          type: boolean
+    LikeResponse:
+      type: object
+      required:
+        - user_id
+        - user_name
+      properties:
+        user_id:
+          description: Идентификатор пользователя, который поставил лайк
+          type: string
+          format: uuid
+          example: d06447d8-2af4-4100-90ed-67c7f12466b7
+        user_name:
+          description: Юзернейм пользователя, который поставил лайк
+          type: string
+          example: some_user
+    CommentRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          description: Текстовый комментарий к публикации, может содержать смайлы
+          type: string
+          maxLength: 2000
+    CommentResponse:
+      type: object
+      required:
+        - user_id
+        - user_name
+        - content
+      properties:
+        created_at:
+          description: Дата создания
+          type: string
+          format: date-time
+          example: 2025-03-09T12:00:00Z
+        user_id:
+          description: Идентификатор пользователя, который оставил комментарий
+          type: string
+          format: uuid
+          example: d06447d8-2af4-4100-90ed-67c7f12466b7
+        user_name:
+          description: Юзернейм пользователя, который оставил комментарий
+          type: string
+          example: some_user
+        content:
+          description: Содержимое комментария, может содержать смайлы
+          type: string
+          example: Аффтар жжет, пиши есчо
+    ImageObject:
+      type: object
+      properties:
+        image_id:
+          type: string
+          format: uuid
+          example: d06447d8-2af4-4100-90ed-67c7f12466b7
+        image_url:
+          type: string
+          format: uri
+          example: https://localhost/uploads/d06447d8-2af4-4100-90ed-67c7f12466b7_image1.jpg
+    PostResponse:
+      type: object
+      required:
+        - post_id
+        - created_at
+        - title
+        - content
+        - media
+      properties:
+        post_id:
+          description: Идентификатор поста
+          type: string
+          format: uuid
+          example: f6697270-4c27-4c75-936a-cc14b400b7c3
+        created_at:
+          description: Дата публикации
+          type: string
+          format: date-time
+          example: 2025-03-09T12:05:00Z
+        title:
+          description: Заголовок поста
+          type: string
+          example: Мой отпуск
+        content:
+          description: Текст поста
+          type: string
+          example: Фотографии с пляжа
+        media:
+          description: Изображения
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/ImageObject"
+        likes:
+          description: Список лайков
+          type: array
+          items:
+            $ref: "#/components/schemas/LikeResponse"
+        comments:
+          description: Список комментариев
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentResponse"
+    PostListResponse:
+      type: object
+      required:
+        - posts
+      properties:
+        posts:
+          description: Массив опубликованных постов
+          type: array
+          items:
+            $ref: "#/components/schemas/PostResponse"
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Код ошибки
+          example: validation_failed
+        message:
+          type: string
+          description: Человекочитаемое описание ошибки
+          example: Неверный формат данных
+    SubscriptionRequest:
+      type: object
+      required:
+        - state
+        - user_id
+      properties:
+        state:
+          description: Признак установки подписки (true - подписка, false - отписка)
+          type: boolean
+        user_id:
+          description: Идентификатор пользователя, на которого подписываются
+          type: string
+          format: uuid
+          example: f6697270-4c27-4c75-936a-cc14b400b7c3
+    SubscriptionResponse:
+      type: object
+      required:
+        - created_at
+        - user_id
+        - user_name
+      properties:
+        created_at:
+          description: Дата подписки
+          type: string
+          format: date-time
+          example: 2025-03-09T12:05:00Z
+        user_id:
+          description: Идентификатор пользователя, на которого подписаны
+          type: string
+          format: uuid
+          example: d06447d8-2af4-4100-90ed-67c7f12466b7
+        user_name:
+          description: Юзернейм пользователя, на которого подписаны
+          type: string
+          example: some_user
+    SubscriptionListResponse:
+      type: object
+      required:
+        - subscriptions
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubscriptionResponse"
+    SearchItem:
+      type: object
+      properties:
+        location:
+          description: Название места
+          type: string
+        post:
+          $ref: "#/components/schemas/PostResponse"
+    SearchResponse:
+      type: object
+      properties:
+        search:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchItem"
+    FeedItem:
+      type: object
+      properties:
+        user_id:
+          description: идентификатор пользователя
+          type: string
+        user_name:
+          description: Юзернейм пользователя, на которого подписаны
+          type: string
+          example: some_user
+        post:
+          $ref: "#/components/schemas/PostResponse"
+    FeedResponse:
+      type: object
+      properties:
+        feeds:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedItem"
+
+security:
+  - BearerAuth: []
+
+paths:
+  /posts/media:
+    post:
+      summary: Загрузка изображений
+      description: Метод загружает изображениe для поста и возвращает его идентификаторы
+      tags:
+        - Posts
+      operationId: createImages
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: string
+                    format: binary
+                  description: Массив изображений для загрузки. Можно отправить несколько файлов с одинаковым именем поля "images".
+              required:
+                - images
+      responses:
+        "201":
+          description: Изображения успешно загружены. Возвращается массив с информацией о каждом.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImagesResponse"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Ошибка валидации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Ошибка привышения лимита.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /posts:
+    get:
+      summary: Получение списка опубликованных постов
+      description: Метод возвращает информацию о постах
+      tags:
+        - Posts
+        - Likes
+        - Comments
+      operationId: readPostList
+      parameters:
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/Until"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Order"
+      responses:
+        "200":
+          description: Список опубликованных постов успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostResponse"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Публикация с данным идентификатором не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      summary: Публикация поста
+      description: Метод загружает пост и возвращает информацию о нем
+      tags:
+        - Posts
+      operationId: createPost
+      requestBody:
+        required: true
+        content:
+          application/json::
+            schema:
+              $ref: "#/components/schemas/PostRequest"
+      responses:
+        "201":
+          description: Пост успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostResponse"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Некорректные данные (например, неверный формат media_ids или отсутствие обязательных полей)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Один или несколько указанных media_ids не найдены.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /posts/{post_id}:
+    get:
+      summary: Получение опубликованного поста
+      description: Метод возвращает информацию о посте
+      tags:
+        - Posts
+        - Likes
+        - Comments
+      operationId: readPost
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      responses:
+        "200":
+          description: Пост успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostResponse"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Публикация с данным идентификатором не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /posts/{post_id}/likes:
+    put:
+      summary: Установка реакции на пост
+      description: Метод позволяет снять/поставить лайк посту
+      tags:
+        - Posts
+        - Likes
+      operationId: updatePostLike
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      requestBody:
+        required: true
+        content:
+          application/json::
+            schema:
+              $ref: "#/components/schemas/LikeRequest"
+      responses:
+        "200":
+          description: Лайк успешно обновлен
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/LikeResponse"
+                  - $ref: "#/components/schemas/Empty"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Публикация с данным идентификатором не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /posts/{post_id}/comments:
+    put:
+      summary: Добавление комментария к посту
+      description: Метод позволяет оставить комментарий к посту
+      tags:
+        - Posts
+        - Comments
+      operationId: updatePostComment
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      requestBody:
+        required: true
+        content:
+          application/json::
+            schema:
+              $ref: "#/components/schemas/CommentRequest"
+      responses:
+        "200":
+          description: Комментарий успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentResponse"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Публикация с данным идентификатором не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /subscriptions:
+    get:
+      summary: Получение списка подписок
+      description: Метод возвращает информацию о подписках пользователя
+      tags:
+        - Subscriptions
+      operationId: readSubscription
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Order"
+      responses:
+        "200":
+          description: Список подписок успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionListResponse"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Изменение подписок
+      description: Метод позволяет добавлять/удалять подписки
+      tags:
+        - Subscriptions
+      operationId: updateSubscription
+      requestBody:
+        required: true
+        content:
+          application/json::
+            schema:
+              $ref: "#/components/schemas/SubscriptionRequest"
+
+      responses:
+        "200":
+          description: Комментарий успешно обновлен
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/SubscriptionResponse"
+                  - $ref: "#/components/schemas/Empty"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Некорректные данные (например, отсутствует пользователь)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /locations:
+    get:
+      summary: Поиск популярных мест
+      description: Метод позволяет найти популярные места для путешествий
+      tags:
+        - Locations
+      operationId: readSearch
+      parameters:
+        - $ref: "#/components/parameters/Location"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Order"
+      responses:
+        "200":
+          description: Поисковая выдача успешно получена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /feed/{user_id}:
+    get:
+      summary: Просмотр ленты
+      description: Метод позволяет просматривать свою ленту или ленту других путешественников
+      tags:
+        - Feed
+      operationId: readFeed
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Order"
+      responses:
+        "200":
+          description: Лента публикаций успешно получена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedResponse"
+        "401":
+          description: Отсутствует или недействителен токен авторизации.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Ошибка сервера.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
